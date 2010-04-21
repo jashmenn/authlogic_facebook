@@ -135,6 +135,28 @@ module AuthlogicFacebook
         end
       end
 
+      def facebook_session
+        return @facebook_session if defined?(@facebook_session)
+        session_key = unverified_facebook_params['session_key']
+
+        uid = nil
+        10.times do
+          params = {'session_key' => session_key}
+          begin
+            uid = MiniFB.call(self.class.facebook_api_key,
+                              self.class.facebook_secret_key,
+                              'Users.getLoggedInUser', params)
+            break
+          rescue Errno::ECONNRESET, EOFError, Timeout::Error => e
+            exception = e
+          end
+        end
+
+        if !uid
+          raise exception
+        end
+      end
+
       protected
 
       def facebook_api_params_provided?
