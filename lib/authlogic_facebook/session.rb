@@ -135,27 +135,41 @@ module AuthlogicFacebook
         end
       end
 
-      def facebook_session
-        return @facebook_session if defined?(@facebook_session)
-        session_key = unverified_facebook_params['session_key']
+      # def facebook_session
+      #   return @facebook_session if defined?(@facebook_session)
+      #   session_key = unverified_facebook_params['session_key']
 
-        uid = nil
-        10.times do
-          params = {'session_key' => session_key}
-          begin
-            uid = MiniFB.call(self.class.facebook_api_key,
-                              self.class.facebook_secret_key,
-                              'Users.getLoggedInUser', params)
-            break
-          rescue Errno::ECONNRESET, EOFError, Timeout::Error => e
-            exception = e
-          end
-        end
+      #   uid = nil
+      #   10.times do
+      #     params = {'session_key' => session_key}
+      #     begin
+      #       uid = MiniFB.call(self.class.facebook_api_key,
+      #                         self.class.facebook_secret_key,
+      #                         'Users.getLoggedInUser', params)
+      #       break
+      #     rescue Errno::ECONNRESET, EOFError, Timeout::Error => e
+      #       exception = e
+      #     end
+      #   end
 
-        if !uid
-          raise exception
-        end
-      end
+      #   if !uid
+      #     raise exception
+      #   end
+
+      #   # Facebook returns quotes on /occasion/ (uh, wtf?)
+      #   uid = uid.strip.sub(/^"(\d+)"$/, '\1')
+      #   @facebook_session = {'uid' => uid, 'session_key' => session_key}
+      # end
+
+      # def unverified_facebook_params
+      #   if defined?(@unverified_facebook_params)
+      #     return @unverified_facebook_params
+      #   end
+
+      #   params = ActiveSupport::JSON.decode(self.controller.params['session'] || '')
+      #   @unverified_facebook_params = params.is_a?(Hash) ? params : {}
+      # end
+
 
       protected
 
@@ -167,9 +181,13 @@ module AuthlogicFacebook
                 warn("Expected #{self.class.name} to declare Facebook API key and secret. Not authenticating using Facebook." || false)
       end
 
+      def facebook_request_params_provided?
+        !self.send(self.facebook_uid_field).blank?
+      end
+
       # Override this if you only want some requests to use facebook
       def authenticating_with_facebook?
-        self.facebook_api_params_provided? && !authenticating_with_unauthorized_record?
+        self.facebook_api_params_provided? && facebook_request_params_provided? && !authenticating_with_unauthorized_record?
       end
 
       def validate_by_facebook
@@ -194,7 +212,7 @@ module AuthlogicFacebook
           end
 
           if self.attempted_record.respond_to?(self.facebook_connect_callback)
-            self.attempted_record.send(self.facebook_connect_callback, self.details)
+            self.attempted_record.send(self.facebook_connect_callback, self)
           end
         else
           errors.add_to_base(I18n.t('error_messages.facebook_connect_by_unregistered_user', :default => 'Your Facebook account is not connected to any registered user on file.'))
